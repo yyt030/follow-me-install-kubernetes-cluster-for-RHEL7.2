@@ -1,4 +1,5 @@
-**本例是依照https://github.com/opsnull/follow-me-install-kubernetes-cluster步骤，在RHEL7.2版本上的实践和整合，其中涉及到的pkg下的相关安装包，请参照原地址下载** 
+**本例是依照[原地址](https://github.com/opsnull/follow-me-install-kubernetes-cluster)步骤，在RHEL7.2版本上的实践和整合，其中涉及到的pkg下的相关安装包，请参照[原地址](https://github.com/opsnull/follow-me-install-kubernetes-cluster)下载** 
+
 
 # 00 组件版本和集群环境
 ## 集群组件和版本
