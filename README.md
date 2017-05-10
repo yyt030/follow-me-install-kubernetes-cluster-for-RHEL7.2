@@ -1,3 +1,5 @@
+**本例是依照https://github.com/opsnull/follow-me-install-kubernetes-cluster步骤，在RHEL7.2版本上的实践和整合，其中涉及到的pkg下的相关安装包，请参照原地址下载** 
+
 # 00 组件版本和集群环境
 ## 集群组件和版本
 + Red Hat Enterprise Linux Server 7.2 (Maipo)
