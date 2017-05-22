@@ -12,6 +12,11 @@ fi
 
 # deploy
 test ! -d $docker_pkg_dir && echo "$docker_pkg_dir not found!" && exit 1
+
+# uninstall package && deal with confix package
+yum remove -y systemd-python-219-19.el7.x86_64 libcgroup-tools-0.41-8.el7.x86_64
+
+# install docker packages
 cd $docker_pkg_dir && yum install -y *.rpm
 
 # disable firewalld & selinux

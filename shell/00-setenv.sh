@@ -3,7 +3,7 @@
 # set env
 ###################################
 
-CURRENT_IP=192.168.59.109 # 当前部署的机器 IP
+CURRENT_IP=192.168.59.107 # 当前部署的机器 IP
 basedir=$HOME/install
 
 # 建议用 未用的网段 来定义服务网段和 Pod 网段
@@ -14,7 +14,7 @@ SERVICE_CIDR="10.254.0.0/16"
 CLUSTER_CIDR="172.30.0.0/16"
 
 # 服务端口范围 (NodePort Range)
-NODE_PORT_RANGE="8400-9000"
+NODE_PORT_RANGE="30000-32767"
 
 # flanneld 网络配置前缀
 FLANNEL_ETCD_PREFIX="/kubernetes/network"

@@ -5,15 +5,14 @@ After=network.target
 
 [Service]
 WorkingDirectory=/var/lib/kube-proxy
+EnvironmentFile=-/etc/kubernetes/config
+EnvironmentFile=-/etc/kubernetes/proxy
 ExecStart=/usr/local/bin/kube-proxy \
-  --bind-address={CURRENT_IP} \
-  --hostname-override={CURRENT_IP} \
-  --cluster-cidr={SERVICE_CIDR} \
-  --kubeconfig=/etc/kubernetes/kube-proxy.kubeconfig \
-  --logtostderr=true \
-  --v=2
+	    $KUBE_LOGTOSTDERR \
+	    $KUBE_LOG_LEVEL \
+	    $KUBE_MASTER \
+	    $KUBE_PROXY_ARGS
 Restart=on-failure
-RestartSec=5
 LimitNOFILE=65536
 
 [Install]

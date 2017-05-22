@@ -6,24 +6,19 @@ Requires=docker.service
 
 [Service]
 WorkingDirectory=/var/lib/kubelet
+EnvironmentFile=-/etc/kubernetes/config
+EnvironmentFile=-/etc/kubernetes/kubelet
 ExecStart=/usr/local/bin/kubelet \
-  --address={CURRENT_IP} \
-  --hostname-override={CURRENT_IP} \
-  --pod-infra-container-image=docker-hub:5000/pause-amd64:3.0 \
-  --experimental-bootstrap-kubeconfig=/etc/kubernetes/bootstrap.kubeconfig \
-  --kubeconfig=/etc/kubernetes/kubelet.kubeconfig \
-  --require-kubeconfig \
-  --cert-dir=/etc/kubernetes/ssl \
-  --cluster_dns={CLUSTER_DNS_SVC_IP} \
-  --cluster_domain={CLUSTER_DNS_DOMAIN} \
-  --hairpin-mode promiscuous-bridge \
-  --cgroup-driver=systemd \
-  --allow-privileged=true \
-  --serialize-image-pulls=false \
-  --logtostderr=true \
-  --v=2
+	    $KUBE_LOGTOSTDERR \
+	    $KUBE_LOG_LEVEL \
+	    $KUBELET_API_SERVER \
+	    $KUBELET_ADDRESS \
+	    $KUBELET_PORT \
+	    $KUBELET_HOSTNAME \
+	    $KUBE_ALLOW_PRIV \
+	    $KUBELET_POD_INFRA_CONTAINER \
+	    $KUBELET_ARGS
 Restart=on-failure
-RestartSec=5
 
 [Install]
 WantedBy=multi-user.target

@@ -1,5 +1,4 @@
-**本例是依照[原地址](https://github.com/opsnull/follow-me-install-kubernetes-cluster)步骤，在RHEL7.2版本上的实践和整合，其中涉及到的pkg下的相关安装包，请参照[原地址](https://github.com/opsnull/follow-me-install-kubernetes-cluster)下载** 
-
+**本例是依照[原地址](https://github.com/opsnull/follow-me-install-kubernetes-cluster)步骤，在RHEL7.2版本上的实践和整合，其中涉及到的pkg下的相关安装包，请参照[原地址](https://github.com/opsnull/follow-me-install-kubernetes-cluster)下载**
 
 # 00 组件版本和集群环境
 ## 集群组件和版本
@@ -210,12 +209,29 @@ https://192.168.31.181:2379 is healthy: successfully committed proposal: took = 
 2017-05-06 07:08:41.153308 I | warning: ignoring ServerName for user-provided CA for backwards compatibility is deprecated
 https://192.168.31.182:2379 is healthy: successfully committed proposal: took = 9.988602ms
 ```
+## 检查 etcd集群中配置的网段信息
+```
+[root@k8s-node2 shell]# ./99-etcdctl.sh get /kubernetes/network/config
+---------------------------------
+2017-05-08 11:35:19.541620 I | warning: ignoring ServerName for user-provided CA for backwards compatibility is deprecated
+{"Network":"172.30.0.0/16", "SubnetLen": 24, "Backend": {"Type": "vxlan"}}
+---------------------------------
+2017-05-08 11:35:19.573973 I | warning: ignoring ServerName for user-provided CA for backwards compatibility is deprecated
+{"Network":"172.30.0.0/16", "SubnetLen": 24, "Backend": {"Type": "vxlan"}}
+---------------------------------
+2017-05-08 11:35:19.612551 I | warning: ignoring ServerName for user-provided CA for backwards compatibility is deprecated
+{"Network":"172.30.0.0/16", "SubnetLen": 24, "Backend": {"Type": "vxlan"}}
+```
 
 # 03 部署kubernetes master节点
 kubernetes master 节点包含的组件：
 + kube-apiserver
 + kube-scheduler
 + kube-controller-manager
++ flanneld
+
+> 安装flanneld组件用以dashboard，heapster访问node上的pod用
+
 目前这三个组件需要部署在同一台机器上
 
 ## 修改环境变量
@@ -223,9 +239,12 @@ kubernetes master 节点包含的组件：
 +  CURRENT_IP
 +  basedir
 +  FLANNEL_ETCD_PREFIX
++  ETCD_ENDPOINTS
 +  KUBE_APISERVER
 +  kube_pkg_dir
 +  kube_tar_file
+
+> ETCD_ENDPOINTS该参数被flanneld启动使用
 
 ## 确认TLS 证书文件
 确认token.csv，ca.pem ca-key.pem kubernetes-key.pem kubernetes.pem 存在
@@ -243,6 +262,50 @@ kubernetes master 节点包含的组件：
 /etc/kubernetes/ssl/kubernetes.pem
 /etc/kubernetes/token.csv
 ```
+## 安装和配置 flanneld
+### 检查修改flanneld指定的网卡信息
++ 查看实际ip所在的网卡名字
+``` bash
+[root@k8s-master shell]# ip a
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+    inet 127.0.0.1/8 scope host lo
+       valid_lft forever preferred_lft forever
+    inet6 ::1/128 scope host
+       valid_lft forever preferred_lft forever
+2: enp0s3: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UP qlen 1000
+    link/ether 08:00:27:9a:d3:e3 brd ff:ff:ff:ff:ff:ff
+    inet 192.168.59.107/24 brd 192.168.59.255 scope global enp0s3
+       valid_lft forever preferred_lft forever
+    inet6 fe80::a00:27ff:fe9a:d3e3/64 scope link
+       valid_lft forever preferred_lft forever
+3: enp0s8: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UP qlen 1000
+    link/ether 08:00:27:1b:de:01 brd ff:ff:ff:ff:ff:ff
+    inet 10.0.3.15/24 brd 10.0.3.255 scope global dynamic enp0s8
+       valid_lft 61351sec preferred_lft 61351sec
+    inet6 fe80::a00:27ff:fe1b:de01/64 scope link
+       valid_lft forever preferred_lft forever
+4: flannel.1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1450 qdisc noqueue state UNKNOWN
+    link/ether 16:f3:e6:95:cb:5f brd ff:ff:ff:ff:ff:ff
+    inet 172.30.50.0/32 scope global flannel.1
+       valid_lft forever preferred_lft forever
+    inet6 fe80::14f3:e6ff:fe95:cb5f/64 scope link
+       valid_lft forever preferred_lft forever
+```
++ 设置网卡名字为：**enp0s3**
+``` bash
+# vi install/shell/00-setenv.sh
+NET_INTERFACE_NAME=enp0s3
+```
+> 因flanneld启动会绑定网卡以生成虚拟ip信息，若不指定，会自动找寻除lookback外的网卡信息
+
+### 安装并启动flanneld
+```
+# cd install/shell
+# ./04-flanneld.sh
+```
+> 该脚本会安装flanneld软件，以供dashboard，heapster可以通过web访问
+
 ## 部署kube-apiserver,kube-scheduler,kube-controller-manager
 执行部署脚本，部署相关master应用
 ``` bash
@@ -250,8 +313,6 @@ kubernetes master 节点包含的组件：
 # ./03-kube-master.sh
 ```
 > 该脚本中会安装kube master相关组件并配置kubectl config
-
-> 该脚本会安装flanneld软件，以供dashboard，heapster可以通过web访问
 
 ## 验证 master 节点功能
 ``` bash
@@ -295,30 +356,8 @@ kubernetes Node 节点包含如下组件：
 /etc/kubernetes/ssl/kubernetes.pem
 /etc/kubernetes/token.csv
 ```
-## 安装和配置 flanneld
-### 检查 etcd 集群 Pod 网段信息
-```
-[root@k8s-node2 shell]# ./99-etcdctl.sh get /kubernetes/network/config
----------------------------------
-2017-05-08 11:35:19.541620 I | warning: ignoring ServerName for user-provided CA for backwards compatibility is deprecated
-{"Network":"172.30.0.0/16", "SubnetLen": 24, "Backend": {"Type": "vxlan"}}
----------------------------------
-2017-05-08 11:35:19.573973 I | warning: ignoring ServerName for user-provided CA for backwards compatibility is deprecated
-{"Network":"172.30.0.0/16", "SubnetLen": 24, "Backend": {"Type": "vxlan"}}
----------------------------------
-2017-05-08 11:35:19.612551 I | warning: ignoring ServerName for user-provided CA for backwards compatibility is deprecated
-{"Network":"172.30.0.0/16", "SubnetLen": 24, "Backend": {"Type": "vxlan"}}
-```
-### 检查flanneld指定的网卡信息
-```
-# vi install/shell/00-setenv.sh
-NET_INTERFACE_NAME=enp0s3
-```
-### 安装并启动flanneld
-```
-# cd install/shell
-# ./04-flanneld.sh
-```
+## 安装和配置 flanneld  
+具体见master上安装flanneld步骤
 
 ## 安装和配置 docker
 ```
@@ -343,7 +382,7 @@ NET_INTERFACE_NAME=enp0s3
 
 ## 安装和配置 kubelet和kube-proxy
 ```
-# ./04-k8s-node.sh
+# ./04-kube-node.sh
 ```
 
 # 05 部署kubedns 插件
@@ -485,3 +524,16 @@ kubectl label nodes 192.168.59.109 beta.kubernetes.io/fluentd-ds-ready=true
 
 ## 访问
 直接通过https访问会报错，可以通过http直接访问8080端口
+
+> 在 Settings -> Indices 页面创建一个 index（相当于 mysql 中的一个database），选中 Index contains time-based events，使用默认的 logstash-* pattern，点击 Create ;
+
+> 节点上的docker日志类型默认为journald, 若需要EFK监控，需要修改docker配置文件，并重启才可以操作生效
+
+```
+# vi /etc/sysconfig/docker
+将如下配置
+OPTIONS='--selinux-enabled --log-driver=journald --signature-verification=false'
+修改为：
+OPTIONS='--selinux-enabled --log-driver=json-file --signature-verification=false'
+重启docker服务后，生效
+```
