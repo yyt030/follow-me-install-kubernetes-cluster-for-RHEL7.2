@@ -10,12 +10,10 @@ else
   exit
 fi
 
-#export ETCDCTL_API=3 
+export ETCDCTL_API=3 
 
 for ip in ${NODE_IPS}; do
-  echo "---------------------------------"
   etcdctl \
   --endpoints=http://${ip}:2379  \
-  $*
-  
+  endpoint health
 done

@@ -1,1 +1,7 @@
 work/
+*.gz
+*.tar
+pkg/cfssl/bin/
+pkg/etcd/etcd-*-linux-amd64/
+*.rpm
+pkg/kubernetes/kubernetes/

@@ -13,7 +13,8 @@ fi
 
 # deploy 
 test ! -f $kube_tar_file && echo "$kube_tar_file not found!"
-cd $kube_pkg_dir && tar -xvf $kube_tar_file
+cd $kube_pkg_dir 
+test ! -d $kube_pkg_dir/kubernetes/ && tar -xvf $kube_tar_file
 cp $kube_pkg_dir/kubernetes/server/bin/{kube-apiserver,kube-controller-manager,kube-scheduler,kubectl,kube-proxy,kubelet} /usr/local/bin
 
 # create service file and config file

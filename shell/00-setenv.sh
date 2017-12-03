@@ -3,8 +3,8 @@
 # set env
 ###################################
 
-CURRENT_IP=192.168.59.107 # 当前部署的机器 IP
-basedir=$HOME/install
+CURRENT_IP=192.168.56.4 # 当前部署的机器 IP
+basedir=$HOME/install-k8s
 
 # 建议用 未用的网段 来定义服务网段和 Pod 网段
 # 服务网段 (Service CIDR），部署前路由不可达，部署后集群内使用 IP:Port 可达
@@ -29,13 +29,15 @@ CLUSTER_DNS_DOMAIN="cluster.local."
 ###################################
 # etcd
 ###################################
-NODE_NAME=etcd-host2 # 当前部署的机器名称(随便定义，只要能区分不同机器即可)
-NODE_IPS="192.168.59.107 192.168.59.108 192.168.59.109" # etcd 集群所有机器 IP
+ETCD_VER=v3.1.11  # 版本号, 根据该版本号找下载地址
+DOWNLOAD_URL=https://github.com/coreos/etcd/releases/download
+NODE_NAME=etcd-host0 # 当前部署的机器名称(随便定义，只要能区分不同机器即可)
+NODE_IPS="192.168.56.4 192.168.56.5 192.168.56.6" # etcd 集群所有机器 IP
 ## etcd 集群各机器名称和对应的IP、端口
-ETCD_NODES=etcd-host0=https://192.168.59.107:2380,etcd-host1=https://192.168.59.108:2380,etcd-host2=https://192.168.59.109:2380
+ETCD_NODES=etcd-host0=http://192.168.56.4:2380,etcd-host1=http://192.168.56.5:2380,etcd-host2=http://192.168.56.6:2380
 
 ## etcd 集群服务地址列表
-ETCD_ENDPOINTS="https://192.168.59.107:2379,https://192.168.59.108:2379,https://192.168.59.109:2379"
+ETCD_ENDPOINTS="http://192.168.56.4:2379,http://192.168.56.5:2379,http://192.168.56.6:2379"
 
 etcd_pkg_dir=$basedir/pkg/etcd
 
@@ -52,7 +54,7 @@ ssl_config_dir=$ssl_pkg_dir/config
 ###################################
 # kubernetes
 ###################################
-KUBE_APISERVER=https://192.168.59.107:6443 # kubelet 访问的 kube-apiserver 的地址
+KUBE_APISERVER=https://192.168.56.4:6443 # kubelet 访问的 kube-apiserver 的地址
 kube_pkg_dir=$basedir/pkg/kubernetes
 kube_tar_file=$kube_pkg_dir/kubernetes-server-linux-amd64.tar.gz
 
@@ -61,11 +63,10 @@ kube_tar_file=$kube_pkg_dir/kubernetes-server-linux-amd64.tar.gz
 # flanneld
 ###################################
 flanneld_pkg_dir=$basedir/pkg/flanneld
-flanneld_rpm_file=$flanneld_pkg_dir/flannel-0.7.0-1.el7.x86_64.rpm
+flanneld_rpm_file=$flanneld_pkg_dir/flannel-0.7.1-2.el7.x86_64.rpm
 NET_INTERFACE_NAME=enp0s3
 
 ###################################
 # docker
 ###################################
 docker_pkg_dir=$basedir/pkg/docker
-
