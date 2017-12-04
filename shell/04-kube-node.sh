@@ -11,7 +11,7 @@ else
 fi
 
 # deploy
-test ! -f $kube_tar_file && echo "$kube_tar_file not found!"
+test ! -f $kube_tar_file && echo "$kube_tar_file not found!" && exit 1
 cd $kube_pkg_dir && tar -xvf $kube_tar_file
 cp $kube_pkg_dir/kubernetes/server/bin/{kubectl,kube-proxy,kubelet} /usr/local/bin
 
