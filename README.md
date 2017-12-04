@@ -1,12 +1,12 @@
 **本例是依照[原地址](https://github.com/opsnull/follow-me-install-kubernetes-cluster)步骤，在RHEL7.2版本上的实践和整合，其中涉及到的pkg下的相关安装包，请参照[原地址](https://github.com/opsnull/follow-me-install-kubernetes-cluster)下载**
 
 # 00 组件版本和集群环境
-## 集群组件和版本
+### 集群组件和版本
 + Red Hat Enterprise Linux Server 7.2 (Maipo)
 + linux kernel 3.10.0-327.el7.x86_64
 + kubernetes 1.6.2
 + docker 1.12.6
-+ etcd 1.12.6
++ etcd 3.1.11
 + Flanneld 0.7.1 vxlan 网络
 + TLS 认证通信 (所有组件，如 etcd、kubernetes master 和 node)
 + RBAC 授权
@@ -14,20 +14,20 @@
 kubedns、dashboard、heapster (influxdb、grafana)、EFK (elasticsearch、fluentd、kibana) 插件
 + 私有 docker registry，使用 ceph rgw 后端存储，TLS + HTTP Basic 认证
 
-## 集群机器
-+ 192.168.59.107
-+ 192.168.59.108
-+ 192.168.59.109
+### 集群机器
++ k8s-master    192.168.56.4
++ k8s-node1     192.168.56.5
++ k8s-node2     192.167.56.6
 
-## 集群环境变量
+### 集群环境变量
 ```
 ###################################
 # global env
 # set env
 ###################################
 
-CURRENT_IP=192.168.59.109 # 当前部署的机器 IP
-basedir=$HOME/install
+CURRENT_IP=192.168.56.4 # 当前部署的机器 IP
+basedir=$HOME/install-k8s
 
 # 建议用 未用的网段 来定义服务网段和 Pod 网段
 # 服务网段 (Service CIDR），部署前路由不可达，部署后集群内使用 IP:Port 可达
@@ -37,7 +37,7 @@ SERVICE_CIDR="10.254.0.0/16"
 CLUSTER_CIDR="172.30.0.0/16"
 
 # 服务端口范围 (NodePort Range)
-NODE_PORT_RANGE="8400-9000"
+NODE_PORT_RANGE="30000-32767"
 
 # flanneld 网络配置前缀
 FLANNEL_ETCD_PREFIX="/kubernetes/network"
@@ -52,13 +52,15 @@ CLUSTER_DNS_DOMAIN="cluster.local."
 ###################################
 # etcd
 ###################################
-NODE_NAME=etcd-host2 # 当前部署的机器名称(随便定义，只要能区分不同机器即可)
-NODE_IPS="192.168.59.107 192.168.59.108 192.168.59.109" # etcd 集群所有机器 IP
+ETCD_VER=v3.2.10  # 版本号, 根据该版本号找下载地址
+DOWNLOAD_URL=https://github.com/coreos/etcd/releases/download
+NODE_NAME=etcd-host0 # 当前部署的机器名称(随便定义，只要能区分不同机器即可)
+NODE_IPS="192.168.56.4 192.168.56.5 192.168.56.6" # etcd 集群所有机器 IP
 ## etcd 集群各机器名称和对应的IP、端口
-ETCD_NODES=etcd-host0=https://192.168.59.107:2380,etcd-host1=https://192.168.59.108:2380,etcd-host2=https://192.168.59.109:2380
+ETCD_NODES=etcd-host0=http://192.168.56.4:2380,etcd-host1=http://192.168.56.5:2380,etcd-host2=http://192.168.56.6:2380
 
 ## etcd 集群服务地址列表
-ETCD_ENDPOINTS="https://192.168.59.107:2379,https://192.168.59.108:2379,https://192.168.59.109:2379"
+ETCD_ENDPOINTS="http://192.168.56.4:2379,http://192.168.56.5:2379,http://192.168.56.6:2379"
 
 etcd_pkg_dir=$basedir/pkg/etcd
 
@@ -75,7 +77,7 @@ ssl_config_dir=$ssl_pkg_dir/config
 ###################################
 # kubernetes
 ###################################
-KUBE_APISERVER=https://192.168.59.107:6443 # kubelet 访问的 kube-apiserver 的地址
+KUBE_APISERVER=https://192.168.56.4:6443 # kubelet 访问的 kube-apiserver 的地址
 kube_pkg_dir=$basedir/pkg/kubernetes
 kube_tar_file=$kube_pkg_dir/kubernetes-server-linux-amd64.tar.gz
 
@@ -118,7 +120,7 @@ kubernetes 系统各组件需要使用 TLS 证书对通信进行加密，本文�
 
 > kubernetes 1.4 开始支持 TLS Bootstrapping 功能，由 kube-apiserver 为客户端生成 TLS 证书，这样就不需要为每个客户端生成证书（该功能目前仅支持 kubelet，所以本文档没有为 kubelet 生成证书和秘钥）。
 
-## 添加集群机器ip
+### 添加集群机器ip
 ``` bash
 # cat install/pkg/cfssl/config/kubernetes-csr.json
 {
@@ -132,46 +134,38 @@ kubernetes 系统各组件需要使用 TLS 证书对通信进行加密，本文�
   ],
   ...
 }
-
 ```
-## 使用脚本生成TLS 证书和秘钥
+> 此步骤在v1.0版本后去掉；不需要添加IP
+
+### 使用脚本生成TLS 证书和秘钥
 ```
 # cd install/shell
 # ./01-mkssl.sh
 ```
 > 该脚本会在/etc/kubernetes/ssl目录下自动生成相关的证书
 
-## 确认证书是否完整
+### 确认证书是否完整
 ``` bash
 # cd /etc/kubernetes
 [root@k8s-master kubernetes]# find token.csv  ssl
-token.csv
-ssl
-ssl/admin-key.pem
-ssl/admin.pem
-ssl/ca-key.pem
-ssl/ca.pem
-ssl/kube-proxy-key.pem
-ssl/kube-proxy.pem
-ssl/kubernetes-key.pem
-ssl/kubernetes.pem
+./ssl
+./ssl/admin-key.pem
+./ssl/admin.pem
+./ssl/ca-key.pem
+./ssl/ca.pem
+./ssl/kube-proxy-key.pem
+./ssl/kube-proxy.pem
+./token.csv
 ```
-
-## 分发证书
-将生成的证书和秘钥文件（后缀名为.pem）拷贝到所有机器的 /etc/kubernetes/ssl 目录下
-
-> 当前机器已在/etc/kubernetes/ssl生成了证书，只需要将该目录copy至其他机器上
-
-> 确保/etc/kubernetes/token.csv 也一并分发
 
 # 02 部署高可用etcd集群
 kuberntes 系统使用 etcd 存储所有数据，本文档介绍部署一个三节点高可用 etcd 集群的步骤，这三个节点复用 kubernetes master 机器，分别命名为etcd-host0、etcd-host1、etcd-host2：
 
-+ etcd-host0：192.168.59.107
-+ etcd-host1：192.168.59.108
-+ etcd-host2：192.168.59.109
++ etcd-host0：192.168.56.4
++ etcd-host1：192.168.56.5
++ etcd-host2：192.168.56.6
 
-## 修改使用的变量
+### 修改使用的变量
 修改当前机器上的00-setenv.sh上的相关ip与配置信息
 +  CURRENT_IP
 +  basedir
@@ -181,14 +175,14 @@ kuberntes 系统使用 etcd 存储所有数据，本文档介绍部署一个三�
 +  ETCD_NODES
 +  ETCD_ENDPOINTS
 
-## 确认TLS 认证文件
+### 确认TLS 认证文件
 需要为 etcd 集群创建加密通信的 TLS 证书，这里复用以前创建的 /etc/kubernetes/ssl 证书,具体如下：
 + ca.pem 
 + kubernetes-key.pem 
 + kubernetes.pem
 > kubernetes证书的hosts字段列表中包含上面三台机器的 IP，否则后续证书校验会失败；
 
-## 安装etcd
+### 安装etcd
 执行安装脚本install/shell/02-etcd.sh
 ``` bash
 # cd install/shell
@@ -197,29 +191,23 @@ kuberntes 系统使用 etcd 存储所有数据，本文档介绍部署一个三�
 > 该脚本会解压etcd安装包，配置文件及etcd.service,并启动etcd.service
 > 在所有的etcd节点重复上面的步骤，直到所有机器etcd 服务都已启动。
 
-## 确认集群状态
+### 确认集群状态
 三台 etcd 的输出均为 healthy 时表示集群服务正常（忽略 warning 信息）
 ``` bash
 # cd install/shell
-# ./99-etcd-status.sh
-2017-05-06 07:08:40.814488 I | warning: ignoring ServerName for user-provided CA for backwards compatibility is deprecated
-https://192.168.31.180:2379 is healthy: successfully committed proposal: took = 8.442607ms
-2017-05-06 07:08:40.989278 I | warning: ignoring ServerName for user-provided CA for backwards compatibility is deprecated
-https://192.168.31.181:2379 is healthy: successfully committed proposal: took = 10.628781ms
-2017-05-06 07:08:41.153308 I | warning: ignoring ServerName for user-provided CA for backwards compatibility is deprecated
-https://192.168.31.182:2379 is healthy: successfully committed proposal: took = 9.988602ms
+[root@k8s-master shell]# ./99-etcds.sh
+http://192.168.56.4:2379 is healthy: successfully committed proposal: took = 1.896744ms
+http://192.168.56.5:2379 is healthy: successfully committed proposal: took = 1.881764ms
+http://192.168.56.6:2379 is healthy: successfully committed proposal: took = 2.034592ms
 ```
-## 检查 etcd集群中配置的网段信息
+### 检查 etcd集群中配置的网段信息
 ```
-[root@k8s-node2 shell]# ./99-etcdctl.sh get /kubernetes/network/config
+[root@k8s-master shell]# ./99-etcdctl.sh get /kubernetes/network/config
 ---------------------------------
-2017-05-08 11:35:19.541620 I | warning: ignoring ServerName for user-provided CA for backwards compatibility is deprecated
 {"Network":"172.30.0.0/16", "SubnetLen": 24, "Backend": {"Type": "vxlan"}}
 ---------------------------------
-2017-05-08 11:35:19.573973 I | warning: ignoring ServerName for user-provided CA for backwards compatibility is deprecated
 {"Network":"172.30.0.0/16", "SubnetLen": 24, "Backend": {"Type": "vxlan"}}
 ---------------------------------
-2017-05-08 11:35:19.612551 I | warning: ignoring ServerName for user-provided CA for backwards compatibility is deprecated
 {"Network":"172.30.0.0/16", "SubnetLen": 24, "Backend": {"Type": "vxlan"}}
 ```
 
@@ -234,7 +222,7 @@ kubernetes master 节点包含的组件：
 
 目前这三个组件需要部署在同一台机器上
 
-## 修改环境变量
+### 修改环境变量
 确认以下环境变量为当前机器上正确的参数
 +  CURRENT_IP
 +  basedir
@@ -246,51 +234,21 @@ kubernetes master 节点包含的组件：
 
 > ETCD_ENDPOINTS该参数被flanneld启动使用
 
-## 确认TLS 证书文件
+### 确认TLS 证书文件
 确认token.csv，ca.pem ca-key.pem kubernetes-key.pem kubernetes.pem 存在
-``` bash
-# find /etc/kubernetes/
-/etc/kubernetes/
-/etc/kubernetes/ssl
-/etc/kubernetes/ssl/admin-key.pem
-/etc/kubernetes/ssl/admin.pem
-/etc/kubernetes/ssl/ca-key.pem
-/etc/kubernetes/ssl/ca.pem
-/etc/kubernetes/ssl/kube-proxy-key.pem
-/etc/kubernetes/ssl/kube-proxy.pem
-/etc/kubernetes/ssl/kubernetes-key.pem
-/etc/kubernetes/ssl/kubernetes.pem
-/etc/kubernetes/token.csv
-```
-## 安装和配置 flanneld
-### 检查修改flanneld指定的网卡信息
+
+### 安装和配置 flanneld
 + 查看实际ip所在的网卡名字
-``` bash
+```bash
 [root@k8s-master shell]# ip a
-1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN
-    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
-    inet 127.0.0.1/8 scope host lo
-       valid_lft forever preferred_lft forever
-    inet6 ::1/128 scope host
-       valid_lft forever preferred_lft forever
+...
 2: enp0s3: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UP qlen 1000
     link/ether 08:00:27:9a:d3:e3 brd ff:ff:ff:ff:ff:ff
     inet 192.168.59.107/24 brd 192.168.59.255 scope global enp0s3
        valid_lft forever preferred_lft forever
     inet6 fe80::a00:27ff:fe9a:d3e3/64 scope link
        valid_lft forever preferred_lft forever
-3: enp0s8: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UP qlen 1000
-    link/ether 08:00:27:1b:de:01 brd ff:ff:ff:ff:ff:ff
-    inet 10.0.3.15/24 brd 10.0.3.255 scope global dynamic enp0s8
-       valid_lft 61351sec preferred_lft 61351sec
-    inet6 fe80::a00:27ff:fe1b:de01/64 scope link
-       valid_lft forever preferred_lft forever
-4: flannel.1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1450 qdisc noqueue state UNKNOWN
-    link/ether 16:f3:e6:95:cb:5f brd ff:ff:ff:ff:ff:ff
-    inet 172.30.50.0/32 scope global flannel.1
-       valid_lft forever preferred_lft forever
-    inet6 fe80::14f3:e6ff:fe95:cb5f/64 scope link
-       valid_lft forever preferred_lft forever
+...
 ```
 + 设置网卡名字为：**enp0s3**
 ``` bash
@@ -299,22 +257,22 @@ NET_INTERFACE_NAME=enp0s3
 ```
 > 因flanneld启动会绑定网卡以生成虚拟ip信息，若不指定，会自动找寻除lookback外的网卡信息
 
-### 安装并启动flanneld
++ 安装并启动flanneld
 ```
 # cd install/shell
 # ./04-flanneld.sh
 ```
 > 该脚本会安装flanneld软件，以供dashboard，heapster可以通过web访问
+> 若安装过程中报错flannel-0.7.0-1.el7.x86_64.rpm找不到，则需要手工下载rpm包至install-k8s/pkg/flanneld/flannel-0.7.0-1.el7.x86_64.rpm下；
 
-## 部署kube-apiserver,kube-scheduler,kube-controller-manager
-执行部署脚本，部署相关master应用
+### 部署kube-apiserver,kube-scheduler,kube-controller-manager, 执行部署脚本，部署相关master应用
 ``` bash
 # cd install/shell
 # ./03-kube-master.sh
 ```
 > 该脚本中会安装kube master相关组件并配置kubectl config
 
-## 验证 master 节点功能
+### 验证 master 节点功能
 ``` bash
 [root@k8s-master shell]# kubectl get componentstatuses
 NAME                 STATUS    MESSAGE              ERROR
@@ -332,7 +290,7 @@ kubernetes Node 节点包含如下组件：
 + kubelet
 + kube-proxy
 
-## 确认环境变量
+### 确认环境变量
 > cat install/shell/00-setenv.sh
 + CURRENT_IP
 + basedir
@@ -340,7 +298,7 @@ kubernetes Node 节点包含如下组件：
 + kube_pkg_dir
 + kube_tar_file
 
-## 确认TLS 证书文件
+### 确认TLS 证书文件
 确认token.csv，ca.pem ca-key.pem kubernetes-key.pem kubernetes.pem 存在
 ```
 # find /etc/kubernetes/
@@ -356,15 +314,23 @@ kubernetes Node 节点包含如下组件：
 /etc/kubernetes/ssl/kubernetes.pem
 /etc/kubernetes/token.csv
 ```
-## 安装和配置 flanneld  
+### 安装和配置 flanneld  
 具体见master上安装flanneld步骤
 
-## 安装和配置 docker
+### 安装和配置 docker
 ```
 # cd install/shell
 # ./04-docker.sh
 
+cat << EOF > /etc/docker/daemon.json
+{
+  "exec-opt": ["native.cgroupdriver=systemd"]
+}
+EOF
 ```
+
+
+
 > 若安装失败，请检查os版本安装时，是否是最小化安装，或者根据报错依赖信息，直接删除掉systemd-python-219-19.el7.x86_64和libcgroup-tools-0.41-8.el7.x86_64
 
 ```
@@ -380,13 +346,20 @@ kubernetes Node 节点包含如下组件：
 # systemctl status -l firewalld
 ```
 
-## 安装和配置 kubelet和kube-proxy
+### 安装和配置 kubelet和kube-proxy
 ```
 # ./04-kube-node.sh
 ```
 
+### 配置内网镜像源地址
+将dockerhub的镜像源地址写入/etc/hosts里面，如：
+``` bash
+echo "192.168.59.107 docker-hub" >> /etc/hosts
+```
+
 # 05 部署kubedns 插件
-## 安装
+
+### 安装
 ``` bash
 # cd install
 [root@k8s-master install]# ls -lrt pkg/kubedns
@@ -409,7 +382,7 @@ service "kube-dns" created
 ``` bash
 level=error msg="Handler for GET /v1.24/images/docker-hub:5000/pause-amd64:3.0/json returned error: No such image: docker-hub:5000/pause-amd64:3.0"
 ```
-## 确认状态
+### 确认状态
 ``` bash
 root@k8s-master install]# kubectl get svc,po -o wide --all-namespaces
 NAMESPACE     NAME             CLUSTER-IP   EXTERNAL-IP   PORT(S)         AGE       SELECTOR
@@ -421,7 +394,7 @@ kube-system   po/kube-dns-682617846-2k9xn   3/3       Running   0          7m   
 ```
 
 # 06 部署 dashboard 插件
-## 创建
+### 创建
 ``` bash
 [root@k8s-master install]# ls -lrt pkg/dashboard/
 总用量 12
@@ -434,7 +407,7 @@ serviceaccount "dashboard" created
 clusterrolebinding "dashboard" created
 service "kubernetes-dashboard" created
 ```
-## 确认状态
+### 确认状态
 ``` bash
 root@k8s-master install]# kubectl get svc,po -o wide --all-namespaces
 NAMESPACE     NAME                       CLUSTER-IP     EXTERNAL-IP   PORT(S)         AGE       SELECTOR
@@ -449,7 +422,7 @@ kube-system   po/kubernetes-dashboard-2172513996-thb5q   1/1       Running   0  
 查看分配的 NodePort
 + 通过之前的命令，可以看到svc/kubernetes-dashboard NodePort 8522映射到 dashboard pod 80端口；
 
-## 访问dashboard
+### 访问dashboard
 + kubernetes-dashboard 服务暴露了 NodePort，可以使用 http://NodeIP:nodePort 地址访问 dashboard；
 ``` bash
 [root@k8s-master shell]# kubectl get po,svc -o wide --all-namespaces |grep dashboard
@@ -478,7 +451,7 @@ monitoring-influxdb is running at https://192.168.59.107:6443/api/v1/proxy/names
 ```
 
 # 07 部署 Heapster插件
-## 创建
+### 创建
 ``` bash
 [root@k8s-master install]# kubectl create -f pkg/heapster/
 deployment "monitoring-grafana" created
@@ -491,7 +464,7 @@ configmap "influxdb-config" created
 deployment "monitoring-influxdb" created
 service "monitoring-influxdb" created
 ```
-## 确认状态
+### 确认状态
 ``` bash
 [root@k8s-master install]# kubectl get svc,po -o wide --all-namespaces
 kube-system   svc/heapster               10.254.244.190   <none>        80/TCP                        28s       k8s-app=heapster
@@ -504,7 +477,7 @@ kube-system   po/monitoring-grafana-1505740515-46r2h     1/1       Running   0  
 kube-system   po/monitoring-influxdb-14932621-ztgh4      1/1       Running   0          27s       172.30.59.3   192.168.59.109
 ```
 # 08 部署 EFK 插件
-## 安装
+### 安装
 ``` bash
 cd install/pkg/EFK
 kubectl create -f .
@@ -516,20 +489,20 @@ DaemonSet fluentd-es-v1.22 只会调度到设置了标签 beta.kubernetes.io/flu
 ``` bash
 kubectl label nodes 192.168.59.109 beta.kubernetes.io/fluentd-ds-ready=true
 ```
-## 检查状态
+### 检查状态
 
 ``` bash
 # kubectl cluster-info
 ```
 
-## 访问
+### 访问
 直接通过https访问会报错，可以通过http直接访问8080端口
 
 > 在 Settings -> Indices 页面创建一个 index（相当于 mysql 中的一个database），选中 Index contains time-based events，使用默认的 logstash-* pattern，点击 Create ;
 
 > 节点上的docker日志类型默认为journald, 若需要EFK监控，需要修改docker配置文件，并重启才可以操作生效
 
-```
+```bash
 # vi /etc/sysconfig/docker
 将如下配置
 OPTIONS='--selinux-enabled --log-driver=journald --signature-verification=false'
