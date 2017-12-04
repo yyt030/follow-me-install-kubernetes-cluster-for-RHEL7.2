@@ -45,7 +45,7 @@ done
 cfssl gencert -initca $ssl_config_dir/ca-csr.json | cfssljson -bare ca
 
 ## create kubernetes
-#cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=$ssl_config_dir/ca-config.json -profile=kubernetes $ssl_config_dir/kubernetes-csr.json | cfssljson -bare kubernetes
+cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=$ssl_config_dir/ca-config.json -profile=kubernetes $ssl_config_dir/kubernetes-csr.json | cfssljson -bare kubernetes
 
 ## create admin
 cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=$ssl_config_dir/ca-config.json -profile=kubernetes $ssl_config_dir/admin-csr.json | cfssljson -bare admin
