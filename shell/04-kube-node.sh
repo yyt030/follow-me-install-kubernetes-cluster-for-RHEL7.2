@@ -34,7 +34,7 @@ sed 's#{CURRENT_IP}#'"$CURRENT_IP"'#g;s#{CLUSTER_DNS_SVC_IP}#'"$CLUSTER_DNS_SVC_
 cp $kube_pkg_dir/config/kubelet.service /usr/lib/systemd/system/kubelet.service
 
 # config
-cd $basedir/shell && ./03-kube-config.sh kubelet
+cd $basedir/shell && ./03-kube-config.sh kubelet && cp $HOME/.kube/config /etc/kubernetes/kubelet.kubeconfig
 
 # systemctl start
 systemctl daemon-reload
