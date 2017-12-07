@@ -13,7 +13,7 @@ spec:
     spec:
       containers:
       - name: influxdb
-        image: docker-hub:5000/heapster-influxdb-amd64:v1.1.1
+        image: 192.168.56.3/gcr.io/google-containers/heapster-influxdb-amd64:v1.1.1
         volumeMounts:
         - mountPath: /data
           name: influxdb-storage

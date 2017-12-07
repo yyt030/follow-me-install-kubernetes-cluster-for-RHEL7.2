@@ -14,7 +14,7 @@ spec:
       serviceAccountName: heapster
       containers:
       - name: heapster
-        image: docker-hub:5000/heapster-amd64:v1.3.0
+        image: 192.168.56.3/gcr.io/google-containers/heapster-amd64:v1.3.0
         imagePullPolicy: IfNotPresent
         command:
         - /heapster
