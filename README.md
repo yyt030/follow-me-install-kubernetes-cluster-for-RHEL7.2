@@ -510,3 +510,21 @@ OPTIONS='--selinux-enabled --log-driver=journald --signature-verification=false'
 OPTIONS='--selinux-enabled --log-driver=json-file --signature-verification=false'
 重启docker服务后，生效
 ```
+
+# 09 基于prometheus对k8s进行监控
+参见[jimmysong](https://jimmysong.io/kubernetes-handbook/practice/using-prometheus-to-monitor-kuberentes-cluster.html)
+
+```bash
+cd pkg/prometheus
+## 创建 monitoring namespaece
+kubectl create -f prometheus-monitoring-ns.yaml
+## 创建 serviceaccount
+kubectl create -f prometheus-monitoring-serviceaccount.yaml
+## 创建 configmaps
+kubectl create -f prometheus-configmaps.yaml
+## 创建 clusterrolebinding
+kubectl create clusterrolebinding kube-state-metrics --clusterrole=cluster-admin --serviceaccount=monitoring:kube-state-metrics
+kubectl create clusterrolebinding prometheus --clusterrole=cluster-admin --serviceaccount=monitoring:prometheus
+## 部署 Prometheus
+kubectl create -f prometheus-monitoring.yaml
+```
