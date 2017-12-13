@@ -4,15 +4,16 @@
 ### 集群组件和版本
 + Red Hat Enterprise Linux Server 7.2 (Maipo)
 + linux kernel 3.10.0-327.el7.x86_64
-+ kubernetes 1.6.2
++ kubernetes v1.7.2
 + docker 1.12.6
 + etcd 3.1.11
-+ Flanneld 0.7.1 vxlan 网络
-+ TLS 认证通信 (所有组件，如 etcd、kubernetes master 和 node)
++ Flanneld 0.7.1-2
++ TLS 认证通信 (所有组件，如kubernetes master 和 node)
 + RBAC 授权
 + kubelet TLS BootStrapping
 kubedns、dashboard、heapster (influxdb、grafana)、EFK (elasticsearch、fluentd、kibana) 插件
-+ 私有 docker registry，使用 ceph rgw 后端存储，TLS + HTTP Basic 认证
++ HTTP Basic 认证
++ Prometheus
 
 ### 集群机器
 + k8s-master    192.168.56.4
@@ -52,7 +53,7 @@ CLUSTER_DNS_DOMAIN="cluster.local."
 ###################################
 # etcd
 ###################################
-ETCD_VER=v3.2.10  # 版本号, 根据该版本号找下载地址
+ETCD_VER=v3.1.11  # 版本号, 根据该版本号找下载地址
 DOWNLOAD_URL=https://github.com/coreos/etcd/releases/download
 NODE_NAME=etcd-host0 # 当前部署的机器名称(随便定义，只要能区分不同机器即可)
 NODE_IPS="192.168.56.4 192.168.56.5 192.168.56.6" # etcd 集群所有机器 IP
@@ -86,7 +87,7 @@ kube_tar_file=$kube_pkg_dir/kubernetes-server-linux-amd64.tar.gz
 # flanneld
 ###################################
 flanneld_pkg_dir=$basedir/pkg/flanneld
-flanneld_rpm_file=$flanneld_pkg_dir/flannel-0.7.0-1.el7.x86_64.rpm
+flanneld_rpm_file=$flanneld_pkg_dir/flannel-0.7.1-2.el7.x86_64.rpm
 NET_INTERFACE_NAME=enp0s3
 
 ###################################
@@ -135,7 +136,7 @@ kubernetes 系统各组件需要使用 TLS 证书对通信进行加密，本文�
   ...
 }
 ```
-> 此步骤在v1.0版本后去掉；不需要添加IP
+> 此步骤在v1.0版本后不需要添加IP
 
 ### 使用脚本生成TLS 证书和秘钥
 ```
@@ -430,7 +431,7 @@ kube-system   po/kubernetes-dashboard-2172513996-thb5q   1/1       Running   0  
 kube-system   po/kubernetes-dashboard-2172513996-thb5q   1/1       Running   1          21h       172.30.77.3   192.168.59.108
 kube-system   svc/kubernetes-dashboard   10.254.41.68     <nodes>       80:8522/TCP                   21h       k8s-app=kubernetes-dashboard
 ```
-> 直接访问： http://192.168.59.108:8522 
+> 直接访问： http://192.168.59.4:8522 
 + 通过 kube-apiserver 访问 dashboard；
 
 ``` bash
@@ -476,6 +477,11 @@ kube-system   po/heapster-1982147024-17ltr               1/1       Running   0  
 kube-system   po/monitoring-grafana-1505740515-46r2h     1/1       Running   0          28s       172.30.57.3   192.168.59.108
 kube-system   po/monitoring-influxdb-14932621-ztgh4      1/1       Running   0          27s       172.30.59.3   192.168.59.109
 ```
+> 通过*http://192.168.56.4:8080/api/v1/namespaces/kube-system/services/monitoring-influxdb:8083/proxy/*
+访问influxdb UI
+
+> 通过*http://192.168.56.4:8080/api/v1/namespaces/kube-system/services/monitoring-grafana/proxy*访问grafana界面
+
 # 08 部署 EFK 插件
 ### 安装
 ``` bash
@@ -516,15 +522,13 @@ OPTIONS='--selinux-enabled --log-driver=json-file --signature-verification=false
 
 ```bash
 cd pkg/prometheus
-## 创建 monitoring namespaece
-kubectl create -f prometheus-monitoring-ns.yaml
-## 创建 serviceaccount
-kubectl create -f prometheus-monitoring-serviceaccount.yaml
-## 创建 configmaps
-kubectl create -f prometheus-configmaps.yaml
-## 创建 clusterrolebinding
+kubectl craete -f .
+
+```
+RBAC 需要用到两个 clusterrolebinding：
+- kube-state-metrics，对应的serviceaccount是kube-state-metrics
+- prometheus，对应的 serviceaccount是 prometheus-k8s
+```bash
 kubectl create clusterrolebinding kube-state-metrics --clusterrole=cluster-admin --serviceaccount=monitoring:kube-state-metrics
 kubectl create clusterrolebinding prometheus --clusterrole=cluster-admin --serviceaccount=monitoring:prometheus
-## 部署 Prometheus
-kubectl create -f prometheus-monitoring.yaml
 ```
